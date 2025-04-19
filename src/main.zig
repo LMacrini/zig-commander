@@ -43,4 +43,4 @@ test "fuzz example" {
 const std = @import("std");
 
 /// This imports the separate module containing `root.zig`. Take a look in `build.zig` for details.
-const lib = @import("zig_commander_lib");
+const lib = @import("commander_lib");
