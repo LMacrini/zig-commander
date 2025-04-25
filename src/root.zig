@@ -312,17 +312,17 @@ fn ParsedCommand(comptime cmd: Command) type {
 
         pub fn init(allocator: std.mem.Allocator) !Self {
             const raw_args = try std.process.argsAlloc(allocator);
-            errdefer allocator.free(raw_args);
+            errdefer std.process.argsFree(allocator, raw_args);
 
-            return initWithSlice(allocator, raw_args[1..]);
+            return initWithSlice(allocator, raw_args);
         }
 
-        pub fn initWithSlice(allocator: std.mem.Allocator, raw_args: []const [:0]u8) !Self {
+        fn initWithSlice(allocator: std.mem.Allocator, raw_args: []const [:0]u8) !Self {
             const has_args = cmd.arguments != null;
             const has_cmd = cmd.commands != null;
 
             var parsed_args: Args = undefined;
-            var parsed_command: SubCmd = undefined;
+            var parsed_command: ?SubCmd = null;
             var parsed_opts: Opts = undefined;
 
             var positionals = ArrayList([]const u8).init(allocator);
@@ -333,6 +333,7 @@ fn ParsedCommand(comptime cmd: Command) type {
             }
 
             var args_iterator: Iterator([]u8) = .init(raw_args);
+            _ = args_iterator.first();
             arg_loop: while (args_iterator.next()) |raw_arg| {
                 if (has_args and !std.mem.startsWith(u8, raw_arg, "-")) {
                     try positionals.append(raw_arg);
@@ -341,7 +342,7 @@ fn ParsedCommand(comptime cmd: Command) type {
                     inline for (cmd.commands.?) |command| {
                         if (std.mem.eql(u8, command.name, raw_arg)) {
                             parsed_command = @unionInit(SubCmd, command.name, 
-                                try .initWithSlice(allocator, raw_args[args_iterator.index.?+1..])
+                                try .initWithSlice(allocator, raw_args[args_iterator.index.?..])
                             );
                             break :arg_loop;
                         }
@@ -398,9 +399,14 @@ fn ParsedCommand(comptime cmd: Command) type {
                 .allocator = allocator,
                 .args = parsed_args,
                 .opts = parsed_opts,
-                .subcommand = parsed_command,
+                .subcommand = if (has_cmd) parsed_command
+                    orelse return error.MissingCommand,
                 .raw_args = raw_args,
             };
+        }
+
+        pub fn deinit(self: *Self) void {
+            std.process.argsFree(self.allocator, self.raw_args);
         }
     };
 }

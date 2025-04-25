@@ -30,11 +30,19 @@ const cmd = blk: {
 };
 
 pub fn main() !void {
+    var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
+    defer if (builtin.mode == .Debug) {
+        _ = debug_allocator.detectLeaks();
+    };
 
-    const res = try cmd.parse(std.heap.page_allocator);
+    const allocator = debug_allocator.allocator();
 
-    std.debug.print("{any}\n", .{res});
+    var res = try cmd.parse(allocator);
+    defer res.deinit();
+
+    std.debug.print("{any}\n", .{res.subcommand.silly.args[0]});
 }
 
 const std = @import("std");
+const builtin = @import("builtin");
 const lib = @import("commander_lib");
