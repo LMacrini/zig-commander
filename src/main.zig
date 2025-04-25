@@ -1,24 +1,39 @@
-//! By convention, main.zig is where your main function lives in the case that
-//! you are building an executable. If you are making a library, the convention
-//! is to delete this file and start with root.zig instead.
+//! This file is just an example
+
+fn parseBool(_: []const u8) !*bool {
+    var b = false;
+    return &b;
+}
+
+const silly = blk: {
+    var new_cmd = lib.Command.init("silly", .{
+        .description = "is silly",
+    });
+
+    _ = new_cmd.addArgument(u8, .{});
+
+    break :blk new_cmd;
+};
+
+const cmd = blk: {
+    var new_cmd = lib.Command.init("main", .{});
+
+    _ = new_cmd.addOption(u8, "ball", 8, .{})
+        .addOption(bool, "enable", true, .{
+            .short = 'e',
+            .description = "enables the switch",
+            .parser = &parseBool,
+        })
+        .addCommand(silly);
+
+    break :blk new_cmd;
+};
 
 pub fn main() !void {
-    comptime var cmd = lib.Command.init("main", .{});
 
-    _ = cmd.addOption(u8, "ball", .{})
-        .addOption(bool, "enable", .{
-            .short = 'e',
-            .default_value = true,
-            .description = "enables the switch"
-        });
+    const res = try cmd.parse(std.heap.page_allocator);
 
-    inline for (cmd.options) |option| {
-        std.debug.print("option: {any} ", .{option});
-        if (option.defaultValue()) |v| {
-            std.debug.print("default value: {any}", .{v});
-        }
-        std.debug.print("\n", .{});
-    }
+    std.debug.print("{any}\n", .{res});
 }
 
 const std = @import("std");
