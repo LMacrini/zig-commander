@@ -37,7 +37,10 @@ pub fn main() !void {
 
     const allocator = debug_allocator.allocator();
 
-    var res = try cmd.parse(allocator);
+    var res = cmd.parse(allocator) catch |err| {
+        std.log.err("{s}", .{@errorName(err)});
+        std.process.exit(1);
+    };
     defer res.deinit();
 
     std.debug.print("{any}\n", .{res.subcommand.silly.args[0]});
