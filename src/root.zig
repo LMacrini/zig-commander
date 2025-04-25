@@ -8,7 +8,6 @@ inline fn toOptPtr(comptime T: type, val: ?T) ?*const T {
 }
 
 pub const ParseError = std.fmt.ParseIntError || std.fmt.ParseFloatError || error {
-    NoParser,
 };
 
 const Param = struct {
@@ -40,7 +39,7 @@ const Param = struct {
         return switch (@typeInfo(self.Type)) {
             .int => std.fmt.parseInt(self.Type, string, 10),
             .bool => self.parseBool(string),
-            else => error.NoParser,
+            else => @compileError("No parser provided"),
         };
     }
 
