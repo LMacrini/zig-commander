@@ -94,11 +94,17 @@ fn OptionConfig(comptime T: type) type {
     };
 }
 
+const FlagConfig = struct {
+    short: ?u8 = null,
+    description: []const u8 = "",
+};
+
 const Option = struct {
     name: [:0]const u8,
     short: ?u8,
     description: []const u8,
     param: Param,
+    is_flag: bool = false,
 
     const Self = @This();
 
@@ -155,6 +161,23 @@ pub const Command = struct {
                 .parser = @ptrCast(opts.parser),
             },
         };
+        self.options = @constCast(self.options ++ .{option});
+        return self;
+    }
+
+    pub fn addFlag(self: *Self, name: [:0]const u8, opts: FlagConfig) *Self {
+        const option: Option = .{
+            .name = name,
+            .short = opts.short,
+            .description = opts.description,
+            .param = .{
+                .Type = bool,
+                .default_value_ptr = &false,
+                .parser = null,
+            },
+            .is_flag = true,
+        };
+
         self.options = @constCast(self.options ++ .{option});
         return self;
     }
@@ -386,6 +409,10 @@ fn ParsedCommand(comptime cmd: Command) type {
                     };
 
                     if (is_match) {
+                        if (option.is_flag) {
+                            @field(parsed_opts, option.name) = true;
+                            break;
+                        }
                         if (args_iterator.next()) |next| {
                             @field(parsed_opts, option.name) = try option.param.parse(next);
                             break;
