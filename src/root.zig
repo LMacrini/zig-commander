@@ -37,6 +37,7 @@ const Param = struct {
         return switch (@typeInfo(self.Type)) {
             .int => std.fmt.parseInt(self.Type, string, 10),
             .bool => parseBool(string),
+            .@"enum" => self.parseEnum(string),
             else => @compileError("No parser provided"),
         };
     }
@@ -70,6 +71,18 @@ const Param = struct {
 
         return error.InvalidCharacter;
     }
+
+    fn parseEnum(self: Self, string: []const u8) ParseError!self.Type {
+        const t_info = @typeInfo(self.Type);
+        std.debug.assert(t_info == .@"enum");
+
+        inline for (t_info.@"enum".fields) |field| {
+            if (std.mem.eql(u8, field.name, string)) {
+                return @enumFromInt(field.value);
+            }
+        }
+
+        return error.InvalidCharacter;
     }
 };
 
