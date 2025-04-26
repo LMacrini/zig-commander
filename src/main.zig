@@ -1,6 +1,6 @@
 //! This file is just an example
 
-const operations = enum {
+const Operations = enum {
     add,
     sub,
 };
@@ -9,7 +9,7 @@ const math_cmd = blk: {
     var new_cmd = lib.Command.init("math", .{});
 
     _ = new_cmd
-        .addArgument(operations, .{
+        .addArgument(Operations, .{
             .description = "do an operation",
         })
         .addArgument(isize, .{})
