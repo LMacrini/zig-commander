@@ -8,6 +8,8 @@ inline fn toOptPtr(comptime T: type, val: ?T) ?*const T {
 }
 
 pub const ParseError = std.fmt.ParseIntError || std.fmt.ParseFloatError || error {
+    ArgumentTooLong,
+    InvalidCharacter,
 };
 
 const Param = struct {
@@ -26,10 +28,6 @@ const Param = struct {
         if (self.parser) |parser| {
             const func: self.ParserType() = @ptrCast(@alignCast(parser));
             return (try func(string)).*;
-
-            // NOTE: another possible way of doing this, probably worse, likely to remove this comment
-            // const res_ptr: *const self.Type = @ptrCast(@alignCast(try parser(string)));
-            // return res_ptr.*;
         }
 
         if (self.Type == []const u8) {
@@ -38,7 +36,7 @@ const Param = struct {
 
         return switch (@typeInfo(self.Type)) {
             .int => std.fmt.parseInt(self.Type, string, 10),
-            .bool => self.parseBool(string),
+            .bool => parseBool(string),
             else => @compileError("No parser provided"),
         };
     }
@@ -47,8 +45,8 @@ const Param = struct {
         return *const fn ([]const u8) ParseError!*const self.Type;
     }
 
-    fn parseBool(self: Self, string: []const u8) !bool {
-        if (string.len > 32) return self.defaultValue() orelse @panic("TODO: add more error handling");
+    fn parseBool(string: []const u8) ParseError!bool {
+        if (string.len > 32) return error.ArgumentTooLong;
         var buf: [32]u8 = undefined;
         const lower = std.ascii.lowerString(&buf, string);
 
@@ -70,7 +68,8 @@ const Param = struct {
             return false;
         }
 
-        return self.defaultValue() orelse @panic("TODO: add more error handling");
+        return error.InvalidCharacter;
+    }
     }
 };
 
@@ -179,6 +178,10 @@ pub const Command = struct {
 
     pub fn parse(self: Self, allocator: std.mem.Allocator) !ParsedCommand(self) {
         return ParsedCommand(self).init(allocator);
+    }
+
+    pub fn ParsedType(self: Self) type {
+        return ParsedCommand(self);
     }
 };
 
@@ -363,7 +366,7 @@ fn ParsedCommand(comptime cmd: Command) type {
                     return error.UnknownArgument;
                 };
 
-                inline for (cmd.options) |option| continue_block: {
+                inline for (cmd.options) |option| {
                     const is_match = switch (option_name) {
                         .short => |c| option.short != null and option.short.? == c,
                         .long => |name| std.mem.eql(u8, option.name, name),
@@ -372,11 +375,13 @@ fn ParsedCommand(comptime cmd: Command) type {
                     if (is_match) {
                         if (args_iterator.next()) |next| {
                             @field(parsed_opts, option.name) = try option.param.parse(next);
-                            break :continue_block;
+                            break;
                         }
 
                         return error.MissingOptionValue;
                     }
+                } else {
+                    try positionals.append(raw_arg);
                 }
             }
 
@@ -392,6 +397,8 @@ fn ParsedCommand(comptime cmd: Command) type {
                 inline for (cmd.arguments.?, 0..) |argument, i| {
                     parsed_args[i] = try argument.param.parse(positionals.items[i]);
                 }
+            } else if (positionals.items.len != 0) {
+                return error.TooManyArguments;
             }
 
             return .{
